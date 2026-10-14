@@ -268,6 +268,17 @@ def is_ipv6(instance: object) -> bool:
     return not getattr(address, "scope_id", "")
 
 
+def _no_trailing_newline(instance: str) -> bool:
+    """
+    Return whether ``instance`` does not end with a newline (U+000A).
+
+    The date-time, time, URI, IRI, and host-name grammars do not allow
+    newlines, but the packages these checkers delegate to inconsistently
+    accept a single trailing newline, so we defend against it here.
+    """
+    return not instance.endswith("\n")
+
+
 with suppress(ImportError):
     from fqdn import FQDN
 
@@ -286,6 +297,8 @@ with suppress(ImportError):
     def is_host_name(instance: object) -> bool:
         if not isinstance(instance, str):
             return True
+        if not _no_trailing_newline(instance):
+            return False
         return FQDN(instance, min_labels=1).is_valid
 
 
@@ -316,6 +329,8 @@ except ImportError:
         def is_uri(instance: object) -> bool:
             if not isinstance(instance, str):
                 return True
+            if not _no_trailing_newline(instance):
+                return False
             return validate_rfc3986(instance, rule="URI")
 
         @_checks_drafts(
@@ -328,6 +343,8 @@ except ImportError:
         def is_uri_reference(instance: object) -> bool:
             if not isinstance(instance, str):
                 return True
+            if not _no_trailing_newline(instance):
+                return False
             return validate_rfc3986(instance, rule="URI_reference")
 
     with suppress(ImportError):
@@ -342,6 +359,8 @@ except ImportError:
         def is_iri(instance: object) -> bool:
             if not isinstance(instance, str):
                 return True
+            if not _no_trailing_newline(instance):
+                return False
             return _rfc3987_is_valid_syntax("iri", instance)
 
         @_checks_drafts(
@@ -353,6 +372,8 @@ except ImportError:
         def is_iri_reference(instance: object) -> bool:
             if not isinstance(instance, str):
                 return True
+            if not _no_trailing_newline(instance):
+                return False
             return _rfc3987_is_valid_syntax("iri_reference", instance)
 
 else:
@@ -366,6 +387,8 @@ else:
     def is_iri(instance: object) -> bool:
         if not isinstance(instance, str):
             return True
+        if not _no_trailing_newline(instance):
+            return False
         return rfc3987.parse(instance, rule="IRI")
 
     @_checks_drafts(
@@ -377,12 +400,16 @@ else:
     def is_iri_reference(instance: object) -> bool:
         if not isinstance(instance, str):
             return True
+        if not _no_trailing_newline(instance):
+            return False
         return rfc3987.parse(instance, rule="IRI_reference")
 
     @_checks_drafts(name="uri", raises=ValueError)
     def is_uri(instance: object) -> bool:
         if not isinstance(instance, str):
             return True
+        if not _no_trailing_newline(instance):
+            return False
         return rfc3987.parse(instance, rule="URI")
 
     @_checks_drafts(
@@ -395,6 +422,8 @@ else:
     def is_uri_reference(instance: object) -> bool:
         if not isinstance(instance, str):
             return True
+        if not _no_trailing_newline(instance):
+            return False
         return rfc3987.parse(instance, rule="URI_reference")
 
 
@@ -405,6 +434,8 @@ with suppress(ImportError):
     def is_datetime(instance: object) -> bool:
         if not isinstance(instance, str):
             return True
+        if not _no_trailing_newline(instance):
+            return False
         return validate_rfc3339(instance.upper())
 
     @_checks_drafts(

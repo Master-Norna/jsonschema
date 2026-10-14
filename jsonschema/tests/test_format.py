@@ -6,7 +6,14 @@ from unittest import TestCase
 
 from jsonschema import FormatChecker, ValidationError
 from jsonschema.exceptions import FormatError
-from jsonschema.validators import Draft4Validator
+from jsonschema.validators import (
+    Draft3Validator,
+    Draft4Validator,
+    Draft6Validator,
+    Draft7Validator,
+    Draft201909Validator,
+    Draft202012Validator,
+)
 
 BOOM = ValueError("Boom!")
 BANG = ZeroDivisionError("Bang!")
@@ -89,3 +96,73 @@ class TestFormatChecker(TestCase):
             repr(checker),
             "<FormatChecker checkers=['bar', 'baz', 'foo']>",
         )
+
+
+class TestNoTrailingNewline(TestCase):
+    """
+    A newline (U+000A) is not part of the date-time, time, URI, IRI, or
+    host-name grammars, but several of the packages these checkers
+    delegate to (e.g. rfc3339-validator, rfc3987, fqdn) accept a single
+    *trailing* newline.
+
+    The instances below are the corresponding "trailing newline is
+    invalid" cases from the official test suite, together with the same
+    instances minus the newline, which must remain valid.
+    """
+
+    CASES = [
+        # (validator, format, valid instance)
+        (Draft3Validator, "date-time", "1985-04-12T23:20:50Z"),
+        (Draft3Validator, "uri", "http://foo.bar/"),
+        (Draft3Validator, "host-name", "example.com"),
+        (Draft4Validator, "date-time", "1985-04-12T23:20:50Z"),
+        (Draft4Validator, "uri", "http://foo.bar/"),
+        (Draft4Validator, "hostname", "example.com"),
+        (Draft6Validator, "date-time", "1985-04-12T23:20:50Z"),
+        (Draft6Validator, "uri", "http://foo.bar/"),
+        (Draft6Validator, "uri-reference", "example.com"),
+        (Draft6Validator, "hostname", "example.com"),
+    ]
+
+    for _validator in (
+        Draft7Validator,
+        Draft201909Validator,
+        Draft202012Validator,
+    ):
+        CASES.append((_validator, "date-time", "1985-04-12T23:20:50Z"))
+        CASES.append((_validator, "time", "08:30:06Z"))
+        CASES.append((_validator, "uri", "http://foo.bar/"))
+        CASES.append((_validator, "uri-reference", "example.com"))
+        CASES.append((_validator, "iri", "http://ƒøø.ßår/"))
+        CASES.append((_validator, "iri-reference", "/âππ"))
+        CASES.append((_validator, "hostname", "example.com"))
+
+    def _assert_format(self, validator, fmt, instance, valid):
+        if fmt not in validator.FORMAT_CHECKER.checkers:
+            self.skipTest(f"{fmt!r} checker not registered")
+        validator_instance = validator(
+            {"format": fmt},
+            format_checker=validator.FORMAT_CHECKER,
+        )
+        self.assertEqual(validator_instance.is_valid(instance), valid)
+
+    def test_trailing_newline_is_invalid(self):
+        for validator, fmt, instance in self.CASES:
+            with self.subTest(validator=validator.__name__, format=fmt):
+                self._assert_format(
+                    validator,
+                    fmt,
+                    instance + "\n",
+                    valid=False,
+                )
+                self._assert_format(
+                    validator,
+                    fmt,
+                    instance + "\r\n",
+                    valid=False,
+                )
+
+    def test_instances_without_newline_still_valid(self):
+        for validator, fmt, instance in self.CASES:
+            with self.subTest(validator=validator.__name__, format=fmt):
+                self._assert_format(validator, fmt, instance, valid=True)
